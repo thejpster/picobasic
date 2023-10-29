@@ -404,10 +404,16 @@ void osload(char *, void *, int) {}
 void ossave(char *, void *, int) {}
 
 // Open a file
-int osopen(int, char *) {}
+int osopen(int, char *)
+{
+    return -1;
+}
 
 // Read a byte from a file
-unsigned char osbget(int, int *) {}
+unsigned char osbget(int, int *)
+{
+    return 0;
+}
 
 // Close file(s)
 void osshut(int) {}
@@ -500,6 +506,7 @@ void setptr(void *chan, long long ptr)
 // Get file size
 long long getext(void *chan)
 {
+    return 0;
 }
 
 // Get EOF status:
@@ -517,6 +524,7 @@ int getims(void)
 // Put event into event queue, unless full:
 int putevt(heapptr handler, int msg, int wparam, int lparam)
 {
+    return -1;
 }
 
 // Get event from event queue, unless empty:

@@ -1,1 +1,2 @@
-build/
+pico/*.o
+pico/*.elf

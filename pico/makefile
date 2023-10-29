@@ -1,36 +1,39 @@
 VPATH = ../src ../BBCSDL/src ../BBCSDL/include
-CXX = arm-none-eabi-gcc -Wall -I ../BBCSDL/include -mcpu=cortex-m0plus -DPICO
+CXX = arm-none-eabi-gcc -Wall -g -I ../BBCSDL/include -mcpu=cortex-m0plus -DPICO
 
 OBJ = bbmain.o bbexec.o bbeval.o bbasmb.o bbdata.o main.o
 
 BINARY = bbcbasic.elf
 
+.PHONY: all rebuild clean debug
+
 all: $(BINARY)
 
-.PHONY: all rebuild clean
-
 clean:
-	@rm $(OBJ) $(BINARY)
+	@rm -f $(OBJ) $(BINARY)
 
 rebuild: clean all
 
 run: $(BINARY)
 	qemu-system-arm -machine mps3-an547 -cpu cortex-m55 -semihosting -serial stdio -kernel $<
 
-main.o: main.c BBC.h
-	$(CXX) -c -O2 $< -o $@
+debug: $(BINARY)
+	qemu-system-arm -machine mps3-an547 -cpu cortex-m55 -semihosting -serial stdio -s -S -kernel $<
 
-bbmain.o: bbmain.c BBC.h
-	$(CXX) -c -O2 $< -o $@
+main.o: main.c
+	$(CXX) -Os -c $< -o $@
 
-bbexec.o: bbexec.c BBC.h
-	$(CXX) -c -O2 $< -o $@
+bbmain.o: bbmain.c
+	$(CXX) -O2 -c $< -o $@
 
-bbeval.o: bbeval.c BBC.h
-	$(CXX) -Wno-array-bounds -c -O2 $< -o $@
+bbexec.o: bbexec.c
+	$(CXX) -O2 -c -Wno-discarded-qualifiers $< -o $@
 
-bbasmb.o: bbasmb_arm_v6m.c BBC.h
-	$(CXX) -c -Os $< -o $@
+bbeval.o: bbeval.c
+	$(CXX) -O2 -Wno-array-bounds -c $< -o $@
+
+bbasmb.o: bbasmb_arm_v6m.c
+	$(CXX) -O2 -c $< -o $@
 
 bbdata.o: bbdata_arm_32.s
 	$(CXX) -c $< -o $@

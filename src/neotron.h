@@ -70,21 +70,21 @@ typedef struct Handle
   uint8_t _0;
 } Handle;
 
-typedef enum FfiResult_Handle_Tag
+typedef enum FfiResult_Tag
 {
   /**
    * The operation succeeded (like [`core::result::Result::Ok`]).
    */
-  Ok_Handle,
+  FfiResult_Ok,
   /**
    * The operation failed (like [`core::result::Result::Err`]).
    */
-  Err_Handle,
-} FfiResult_Handle_Tag;
+  FfiResult_Err,
+} FfiResult_Tag;
 
 typedef struct FfiResult_Handle
 {
-  FfiResult_Handle_Tag tag;
+  FfiResult_Tag tag;
   union
   {
     struct
@@ -125,21 +125,9 @@ typedef struct FfiString
   struct FfiByteSlice _0;
 } FfiString;
 
-typedef enum FfiResult_usize_Tag
-{
-  /**
-   * The operation succeeded (like [`core::result::Result::Ok`]).
-   */
-  Ok_usize,
-  /**
-   * The operation failed (like [`core::result::Result::Err`]).
-   */
-  Err_usize,
-} FfiResult_usize_Tag;
-
 typedef struct FfiResult_usize
 {
-  FfiResult_usize_Tag tag;
+  FfiResult_Tag tag;
   union
   {
     struct
@@ -169,21 +157,9 @@ typedef struct FfiBuffer
   uintptr_t data_len;
 } FfiBuffer;
 
-typedef enum FfiResult_u64_Tag
-{
-  /**
-   * The operation succeeded (like [`core::result::Result::Ok`]).
-   */
-  Ok_u64,
-  /**
-   * The operation failed (like [`core::result::Result::Err`]).
-   */
-  Err_u64,
-} FfiResult_u64_Tag;
-
 typedef struct FfiResult_u64
 {
-  FfiResult_u64_Tag tag;
+  FfiResult_Tag tag;
   union
   {
     struct
@@ -274,21 +250,9 @@ typedef struct Entry
   struct Stat properties;
 } Entry;
 
-typedef enum FfiResult_Entry_Tag
-{
-  /**
-   * The operation succeeded (like [`core::result::Result::Ok`]).
-   */
-  Ok_Entry,
-  /**
-   * The operation failed (like [`core::result::Result::Err`]).
-   */
-  Err_Entry,
-} FfiResult_Entry_Tag;
-
 typedef struct FfiResult_Entry
 {
-  FfiResult_Entry_Tag tag;
+  FfiResult_Tag tag;
   union
   {
     struct
@@ -302,21 +266,9 @@ typedef struct FfiResult_Entry
   };
 } FfiResult_Entry;
 
-typedef enum FfiResult_Stat_Tag
-{
-  /**
-   * The operation succeeded (like [`core::result::Result::Ok`]).
-   */
-  Ok_Stat,
-  /**
-   * The operation failed (like [`core::result::Result::Err`]).
-   */
-  Err_Stat,
-} FfiResult_Stat_Tag;
-
 typedef struct FfiResult_Stat
 {
-  FfiResult_Stat_Tag tag;
+  FfiResult_Tag tag;
   union
   {
     struct
@@ -330,33 +282,17 @@ typedef struct FfiResult_Stat
   };
 } FfiResult_Stat;
 
-typedef enum FfiResult_____c_void_Tag
+typedef struct FfiResult_void
 {
-  /**
-   * The operation succeeded (like [`core::result::Result::Ok`]).
-   */
-  Ok_____c_void,
-  /**
-   * The operation failed (like [`core::result::Result::Err`]).
-   */
-  Err_____c_void,
-} FfiResult_____c_void_Tag;
-
-typedef struct FfiResult_____c_void
-{
-  FfiResult_____c_void_Tag tag;
+  FfiResult_Tag tag;
   union
   {
-    struct
-    {
-      void *ok;
-    };
     struct
     {
       enum Error err;
     };
   };
-} FfiResult_____c_void;
+} FfiResult_void;
 
 /**
  * The syscalls provided by the Neotron OS to a Neotron Application.
@@ -386,7 +322,7 @@ typedef struct NeotronApi
    * closing a file may cause the directory entry to be incorrect, and you
    * may need to run `CHKDSK` (or similar) on your disk to fix it.
    */
-  struct FfiResult_____c_void (*close)(struct Handle fd);
+  struct FfiResult_void (*close)(struct Handle fd);
   /**
    * Write to an open file handle, blocking until everything is written.
    *
@@ -396,7 +332,7 @@ typedef struct NeotronApi
    * The `buffer` is only borrowed for the duration of the function call and
    * is then forgotten.
    */
-  struct FfiResult_____c_void (*write)(struct Handle fd, struct FfiByteSlice buffer);
+  struct FfiResult_void (*write)(struct Handle fd, struct FfiByteSlice buffer);
   /**
    * Read from an open file, returning how much was actually read.
    *
@@ -413,7 +349,7 @@ typedef struct NeotronApi
    *
    * Some files do not support seeking and will produce an error.
    */
-  struct FfiResult_____c_void (*seek_set)(struct Handle fd, uint64_t position);
+  struct FfiResult_void (*seek_set)(struct Handle fd, uint64_t position);
   /**
    * Move the file offset (for the given file handle) relative to the current position.
    *
@@ -440,7 +376,7 @@ typedef struct NeotronApi
    * not on the same drive.
    * * Paths must confirm to the rules for the filesystem for the given drive.
    */
-  struct FfiResult_____c_void (*rename)(struct FfiString old_path, struct FfiString new_path);
+  struct FfiResult_void (*rename)(struct FfiString old_path, struct FfiString new_path);
   /**
    * Perform a special I/O control operation.
    */
@@ -452,7 +388,7 @@ typedef struct NeotronApi
   /**
    * Close a previously opened directory.
    */
-  struct FfiResult_____c_void (*closedir)(struct Handle dir);
+  struct FfiResult_void (*closedir)(struct Handle dir);
   /**
    * Read from an open directory
    */
@@ -472,7 +408,7 @@ typedef struct NeotronApi
    *
    * * You cannot delete a file if it is currently open.
    */
-  struct FfiResult_____c_void (*deletefile)(struct FfiString path);
+  struct FfiResult_void (*deletefile)(struct FfiString path);
   /**
    * Delete a directory.
    *
@@ -481,7 +417,7 @@ typedef struct NeotronApi
    * * You cannot delete a root directory.
    * * You cannot delete a directory that has any files or directories in it.
    */
-  struct FfiResult_____c_void (*deletedir)(struct FfiString path);
+  struct FfiResult_void (*deletedir)(struct FfiString path);
   /**
    * Change the current directory.
    *
@@ -490,14 +426,14 @@ typedef struct NeotronApi
    * Unlike on MS-DOS, there is only one current directory for the whole
    * system, not one per drive.
    */
-  struct FfiResult_____c_void (*chdir)(struct FfiString path);
+  struct FfiResult_void (*chdir)(struct FfiString path);
   /**
    * Change the current directory to the given open directory.
    *
    * Unlike on MS-DOS, there is only one current directory for the whole
    * system, not one per drive.
    */
-  struct FfiResult_____c_void (*dchdir)(struct Handle dir);
+  struct FfiResult_void (*dchdir)(struct Handle dir);
   /**
    * Get the current directory.
    *
@@ -514,7 +450,7 @@ typedef struct NeotronApi
    * * `alignment` - the returned address will have this alignment, or
    *   better. For example, pass `4` if you are allocating an array of `u32`.
    */
-  struct FfiResult_____c_void (*malloc)(uintptr_t size, uintptr_t alignment);
+  struct FfiResult_void (*malloc)(uintptr_t size, uintptr_t alignment);
   /**
    * Free some previously allocated memory.
    *

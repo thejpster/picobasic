@@ -64,7 +64,7 @@ void *sysadr(char *name)
 unsigned char osrdch(void)
 {
     unsigned char ch;
-    while (read(1, &ch, 1) != 1)
+    while (read(0, &ch, 1) != 1)
     {
         // spin
     }
@@ -124,12 +124,6 @@ void osline(char *buffer)
         {
         case 0x0A:
         case 0x0D:
-            printf("Buffer contains:");
-            for (int i = 0; i < 256; i++)
-            {
-                printf("%02x ", buffer[i]);
-            }
-            printf("\r\n");
             return;
 
         case 8:
@@ -294,7 +288,9 @@ void reset(void)
 // Test for ESCape
 void trap(void)
 {
+#ifdef DEBUG_OUTPUT
     printf("trap()\n");
+#endif
 }
 
 // Load a file to memory
@@ -663,8 +659,8 @@ int _write(int file, char *ptr, int len)
     {
         Handle fd = {._0 = 1};
         FfiByteSlice buffer = {.data = (const uint8_t *)ptr, .data_len = len};
-        FfiResult_____c_void result = g_api->write(fd, buffer);
-        if (result.tag == Ok_____c_void)
+        FfiResult_void result = g_api->write(fd, buffer);
+        if (result.tag == FfiResult_Ok)
         {
             return len;
         }
@@ -681,12 +677,12 @@ int _write(int file, char *ptr, int len)
 
 int _read(int file, char *ptr, int len)
 {
-    if (file == 1)
+    if (file == 0)
     {
-        Handle fd = {._0 = 1};
+        Handle fd = {._0 = 0};
         FfiBuffer buffer = {.data = (uint8_t *)ptr, .data_len = len};
         FfiResult_usize result = g_api->read(fd, buffer);
-        if (result.tag == Ok_usize)
+        if (result.tag == FfiResult_Ok)
         {
             return result.ok;
         }
@@ -703,6 +699,8 @@ int _read(int file, char *ptr, int len)
 
 void app_entry(NeotronApi *api)
 {
+    // Turn off newlib output buffering
+    setbuf(stdout, NULL);
     g_api = api;
 
     accs = (char *)userRAM;           // String accumulator

@@ -1,5 +1,5 @@
 VPATH = ../src ../BBCSDL/src ../BBCSDL/include
-CXX = arm-none-eabi-gcc -Wall -g -I ../BBCSDL/include -mcpu=cortex-m0plus -DPICO
+CXX = arm-none-eabi-gcc -Wall -g -fshort-enums -I ../BBCSDL/include -mcpu=cortex-m0plus -DPICO
 
 OBJ = bbmain.o bbexec.o bbeval.o bbasmb.o bbdata.o main.o
 

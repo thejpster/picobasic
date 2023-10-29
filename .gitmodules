@@ -1,0 +1,3 @@
+[submodule "BBCSDL"]
+	path = BBCSDL
+	url = https://github.com/rtrussell/BBCSDL.git

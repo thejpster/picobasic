@@ -13,13 +13,9 @@ Inspired by and in some places copied from https://github.com/Memotech-Bill/Pico
 #include <unistd.h>
 #include <sys/stat.h>
 
-#include "bbccon.h"
+#include "neotron.h"
 
-// UART registers for the MPS3-AN547 machine that QEMU emulates
-#define UART0_BASE ((unsigned int *)0x59303000)
-#define UART0_STATUS (UART0_BASE + 1)
-#define UART0_CONTROL (UART0_BASE + 2)
-#define UART0_BAUDDIV (UART0_BASE + 4)
+#include "bbccon.h"
 
 unsigned int palette[256];
 void *TTFcache[1];
@@ -33,6 +29,7 @@ char *szTempDir;
 char *szCmdLine;
 const char szNotice[] = "(C) Copyright R. T. Russell, " YEAR;
 const char szVersion[] = "BBC BASIC for Neotron version " VERSION;
+static NeotronApi *g_api = NULL;
 
 static char *heap_end = 0;
 
@@ -56,76 +53,6 @@ extern char _heap_top;
 
 extern int basic(void *ecx, void *edx, void *prompt);
 extern void error(int code, const char *msg);
-
-int main(void);
-
-void rst_handler(void)
-{
-    // Copy the .data section pointers to ram from flash.
-    // Look at LD manual (Optional Section Attributes).
-
-    // source and destination pointers
-    unsigned long *src;
-    unsigned long *dest;
-
-    // this should be good!
-    src = &_start_data_flash;
-    dest = &_start_data;
-
-    // this too
-    while (dest < &_end_data)
-    {
-        *dest++ = *src++;
-    }
-
-    // now set the .bss segment to 0!
-    dest = &__bss_start__;
-    while (dest < &__bss_end__)
-    {
-        *dest++ = 0;
-    }
-
-    // after setting copying .data to ram and "zero-ing" .bss we are good
-    // to start the main() method!
-    // There you go!
-    main();
-
-    /* Oops! You fell off the end of main. */
-    while (1)
-    {
-        /* Spin */
-    }
-}
-
-void empty_def_handler(void)
-{
-}
-
-// NVIC ISR table
-__attribute__((section(".nvic_table"))) unsigned long myvectors[] =
-    {
-        // This are the fixed priority interrupts and the stack pointer loaded at startup at R13 (SP).
-        //                                              VECTOR N (Check Datasheet)
-        // here the compiler it's boring.. have to figure that out
-        (unsigned long)&_stack_top,       // stack pointer should be
-                                          // placed here at startup.          0
-        (unsigned long)rst_handler,       // code entry point                 1
-        (unsigned long)empty_def_handler, // NMI handler.                     2
-        (unsigned long)empty_def_handler, // hard fault handler.              3
-                                          // Configurable priority interruts handler start here.
-        (unsigned long)empty_def_handler, // Memory Management Fault          4
-        (unsigned long)empty_def_handler, // Bus Fault                        5
-        (unsigned long)empty_def_handler, // Usage Fault                      6
-        0,                                // Reserved                         7
-        0,                                // Reserved                         8
-        0,                                // Reserved                         9
-        0,                                // Reserved                         10
-        (unsigned long)empty_def_handler, // SV call                          11
-        (unsigned long)empty_def_handler, // Debug monitor                    12
-        0,                                // Reserved                         13
-        (unsigned long)empty_def_handler, // PendSV                           14
-        (unsigned long)empty_def_handler, // SysTick                          15
-};
 
 void *sysadr(char *name)
 {
@@ -734,15 +661,17 @@ int _write(int file, char *ptr, int len)
 {
     if (file == 1)
     {
-        for (int idx = 0; idx < len; idx++)
+        Handle fd = {._0 = 1};
+        FfiByteSlice buffer = {.data = (const uint8_t *)ptr, .data_len = len};
+        FfiResult_____c_void result = g_api->write(fd, buffer);
+        if (result.tag == Ok_____c_void)
         {
-            while ((*UART0_STATUS & 1) != 0)
-            {
-                // spin because UART full
-            }
-            *UART0_BASE = ptr[idx];
+            return len;
         }
-        return len;
+        else
+        {
+            return -1;
+        }
     }
     else
     {
@@ -754,16 +683,17 @@ int _read(int file, char *ptr, int len)
 {
     if (file == 1)
     {
-        for (int idx = 0; idx < len; idx++)
+        Handle fd = {._0 = 1};
+        FfiBuffer buffer = {.data = (uint8_t *)ptr, .data_len = len};
+        FfiResult_usize result = g_api->read(fd, buffer);
+        if (result.tag == Ok_usize)
         {
-            if ((*UART0_STATUS & 2) == 0)
-            {
-                // UART is empty
-                return idx;
-            }
-            ptr[idx] = *UART0_BASE;
+            return result.ok;
         }
-        return len;
+        else
+        {
+            return -1;
+        }
     }
     else
     {
@@ -771,11 +701,9 @@ int _read(int file, char *ptr, int len)
     }
 }
 
-int main(void)
+void app_entry(NeotronApi *api)
 {
-    // Init uart
-    *UART0_BAUDDIV = 25000000 / 115200;
-    *UART0_CONTROL = 3;
+    g_api = api;
 
     accs = (char *)userRAM;           // String accumulator
     buff = (char *)accs + ACCSLEN;    // Temporary string buffer
@@ -800,5 +728,4 @@ int main(void)
     userTOP = userRAM + DEFAULT_RAM;
     void *progRAM = userRAM + PAGE_OFFSET; // Will be raised if @cmd$ exceeds 255 bytes
     basic(progRAM, userTOP, 0);
-    return 0;
 }

@@ -39,4 +39,4 @@ bbdata.o: bbdata_arm_32.s
 	$(CXX) -c $< -o $@
 
 $(BINARY): $(OBJ)
-	$(CXX) $^ -L. -lm -Wl,-T../linker.ld -o $@
+	$(CXX) $^ -L. -lm -Wl,-T../linker.ld -nostartfiles -o $@

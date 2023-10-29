@@ -1,112 +1,91 @@
 /*
-* Copyright (c) 2012, Mauro Scomparin
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following conditions are met:
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in the
-*       documentation and/or other materials provided with the distribution.
-*     * Neither the name of Mauro Scomparin nor the
-*       names of its contributors may be used to endorse or promote products
-*       derived from this software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY Mauro Scomparin ``AS IS'' AND ANY
-* EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-* DISCLAIMED. IN NO EVENT SHALL Mauro Scomparin BE LIABLE FOR ANY
-* DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*
-* Author:   Mauro Scomparin <http://scompoprojects.wordpress.com>.
-* Author:   Jonathan Pallant <http://railwayelectronics.blogspot.com>.
-* Description:  Linker description file for QEMU Cortex-M systems
-*/
+ * Neotron Application linker script for Arm Cortex-M systems.
+ *
+ * Based on the [Rust Embedded Cortex-M crate](https://github.com/rust-embedded/cortex-m).
+ * 
+ * Copyright (c) 2016 Jorge Aparicio.
+ * Copyright (c) 2023 Jonathan 'theJPster' Pallant and the Neotron Developers.
+ */
 
 MEMORY
 {
-    FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 512K
-    SRAM (rwx) : ORIGIN = 0x20000000, LENGTH = 512K
+    /*
+     * This is the Transient Program Area.
+     *
+     * This is defined by the Neotron specification for a given platform. On this
+     * Cortex-M based platform, it's the start of Cortex-M SRAM, plus 4 KiB, or
+     * 0x2000_1000.
+     */
+    RAM   (rwx) : ORIGIN = 0x20001000, LENGTH = 229232
 }
 
-_stack_size = 0x1000;    
+/* # Entry point = what the BIOS calls to start the OS */
+ENTRY(app_entry);
 
-/*
-* Sections definitions:
-*
-* .text     - machine instructions.
-* .ARM*     - No idea
-* .eh_frame - No idea
-* .data     - initialized data defined in the program.
-* .bss      - un-initialized global and static variables (to be initialized to 0 before starting main).
-*/
+/* # Sections */
 SECTIONS
-{ 
-    /* This section it's the code, containing the NVIC Vector table that must start at 0x0
-     *   Look at the LM4F120H5QR datasheet for details. (Table 2-8. Exception Types)
-     */
+{
+  /* ### .text */
+  .text : ALIGN(4)
+  {
+    . = ALIGN(4);
+    *(.text .text.*);
+    . = ALIGN(4);
+  }
 
-    .text : 
-    {
-        KEEP(*(.nvic_table))     /* This must be first. It tells the ARM where the stack and IRQ vectors are. */
-                                 /* KEEP stops it being removed as we don't refer to it anywhere. */
-        *    (.text .text.*)     /* This contains most of the executable code. */
-        *    (.init)             /* This section is used by the C-library, newlib. */
-        *    (.fini)             /* This section is used by the C-library, newlib. */
-        *    (.glue_7)           /* This section is used by the compiler */
-        *    (.glue_7t)          /* This section is used by the compiler */
-        *    (.vfp11_veneer)     /* This section is used by the compiler */
-        *    (.v4_bx)            /* This section is used by the compiler */
-        *    (.ARM.extab)        /* This section is used by the compiler */
-        *    (.rodata .rodata.*) /* Read only data (const variables) */
-    } > FLASH
+  /* ### .rodata */
+  .rodata : ALIGN(4)
+  {
+    . = ALIGN(4);
+    *(.rodata .rodata.*);
+    . = ALIGN(4);
+  }
 
-    /* This section are used by the compiler and/or the C-library, newlib. */
-    /* It is a 'sorted' section and so must be separate from .text above. */
-    .ARM.exidx :
-    {
-        *(.ARM.exidx)
-    } > FLASH
+  /* ### .data */
+  .data : ALIGN(4)
+  {
+    . = ALIGN(4);
+    *(.data .data.*);
+    . = ALIGN(4);
+  }
 
-    _start_data_flash = ALIGN(8);
+  /* LMA of .data */
+  __sidata = LOADADDR(.data);
 
-    /* 
-     * .data segment must be placed in RAM but it's originally stored in FLASH
-     * So I set the data segment in ram, but I specify the load address with the AT
-     * keyword to set that right after the .text section.
-     * (Look at the LD documentation. (Optional Section Attributes)) 
-     * Thanks https://github.com/utzig for the hints!
-     */
-    .data : AT (_start_data_flash)
-    {
-        _start_data = .;  /* An index to the beginning of .data segment. */
-        *(.data .data.*)  /* Initialised program data */
-        *(.eh_frame)      /* C++ exception handling data */
-        _end_data = .;    /* And another index to the end of .data segment. */
-    } > SRAM 
+  /* ### .bss */
+  .bss : ALIGN(4)
+  {
+    . = ALIGN(4);
+    *(.bss .bss.*);
+    . = ALIGN(4);
+  }
 
-    /* 
-    * .bss contains the unitialized variables and must be set as 0x0 during runtime.
-    * It should be loaded in RAM and particular care should be taken initializing them in the startup file. 
-    */
-    .bss :
-    {
-        __bss_start__ = .;  /* This is an index to the beginning of .bss segment. */
-        *(.bss .bss.*)      /* The un-initialized data should go there.  */
-        *(COMMON)           /* All the other stuff should be put there */
-        __bss_end__ = .;    /* End index for .bss segment */
-    } > SRAM
+  /* ### .uninit */
+  .uninit (NOLOAD) : ALIGN(4)
+  {
+    . = ALIGN(4);
+    *(.uninit .uninit.*);
+    . = ALIGN(4);
+  }
 
-    _heap_bottom = .;
-    _heap_top = ORIGIN(SRAM) + LENGTH(SRAM) - _stack_size;
+  /* ## .got */
+  /* Dynamic relocations are unsupported. This section is only used to detect relocatable code in
+     the input files and raise an error if relocatable code is found */
+  .got (NOLOAD) :
+  {
+    KEEP(*(.got .got.*));
+  }
 
-    _stack_bottom = _heap_top;
-    _stack_top = ORIGIN(SRAM) + LENGTH(SRAM);
-  
+  /* ## Discarded sections */
+  /DISCARD/ :
+  {
+    /* Unused exception related info that only wastes space */
+    *(.ARM.exidx);
+    *(.ARM.exidx.*);
+    *(.ARM.extab.*);
+  }
+
+  _heap_bottom = .;
+  _heap_top = ORIGIN(RAM) + LENGTH(RAM);
+
 }

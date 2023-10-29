@@ -13,16 +13,13 @@ Inspired by and in some places copied from https://github.com/Memotech-Bill/Pico
 #include <unistd.h>
 #include <sys/stat.h>
 
-#include "BBC.h"
+#include "bbccon.h"
 
 // UART registers for the MPS3-AN547 machine that QEMU emulates
 #define UART0_BASE ((unsigned int *)0x59303000)
 #define UART0_STATUS (UART0_BASE + 1)
 #define UART0_CONTROL (UART0_BASE + 2)
 #define UART0_BAUDDIV (UART0_BASE + 4)
-
-#define PAGE_OFFSET ACCSLEN + 0x1300
-#define HISTORY 10
 
 unsigned int palette[256];
 void *TTFcache[1];
@@ -34,9 +31,10 @@ char *szLibrary;
 char *szUserDir;
 char *szTempDir;
 char *szCmdLine;
-const char szNotice[] = "This is Neotron BBC BASIC\n";
+const char szNotice[] = "(C) Copyright R. T. Russell, " YEAR;
+const char szVersion[] = "BBC BASIC for Neotron version " VERSION;
 
-extern char vflags;
+static char *heap_end = 0;
 
 // defined by the linker it's the stack top variable (End of ram)
 extern unsigned long _stack_top;
@@ -129,8 +127,9 @@ __attribute__((section(".nvic_table"))) unsigned long myvectors[] =
         (unsigned long)empty_def_handler, // SysTick                          15
 };
 
-void *sysadr(char *_name)
+void *sysadr(char *name)
 {
+    printf("sysadr(%s)\n", name);
     return NULL;
 }
 
@@ -152,8 +151,18 @@ int oskey(int wait)
 }
 
 // Handle OS command
-void oscli(char *)
+void oscli(char *command)
 {
+    if (strcmp(command, "INFO\r") == 0)
+    {
+        puts("INFO:");
+        printf("    _heap_top = %p\n", &_heap_top);
+        printf(" _heap_bottom = %p\n", &_heap_bottom);
+        printf("     heap_end = %p\n", heap_end);
+        printf("userRAMBuffer = %p\n", userRAMBuffer);
+        printf("      userRAM = %p\n", userRAM);
+        printf("      userTOP = %p\n", userTOP);
+    }
 }
 
 // Write to display or other output stream (VDU)
@@ -174,9 +183,6 @@ void oswrch(unsigned char ch)
 // Read line of input
 void osline(char *buffer)
 {
-    static char *history[HISTORY] = {NULL};
-    static int empty = 0;
-    int current = empty;
     char *eol = buffer;
     char *p = buffer;
     *buffer = 0x0D;
@@ -191,20 +197,12 @@ void osline(char *buffer)
         {
         case 0x0A:
         case 0x0D:
-            n = (char *)memchr(buffer, 0x0D, 256) - buffer;
-            if (n == 0)
-                return;
-            if ((current == (empty + HISTORY - 1) % HISTORY) &&
-                (0 == memcmp(buffer, history[current], n)))
-                return;
-            history[empty] = malloc(n + 1);
-            memcpy(history[empty], buffer, n + 1);
-            empty = (empty + 1) % HISTORY;
-            if (history[empty])
+            printf("Buffer contains:");
+            for (int i = 0; i < 256; i++)
             {
-                free(history[empty]);
-                history[empty] = NULL;
+                printf("%02x ", buffer[i]);
             }
+            printf("\r\n");
             return;
 
         case 8:
@@ -291,41 +289,6 @@ void osline(char *buffer)
             }
             break;
 
-        case 138:
-        case 139:
-            if (key == 138)
-                n = (current + 1) % HISTORY;
-            else
-                n = (current + HISTORY - 1) % HISTORY;
-            if (history[n])
-            {
-                char *s = history[n];
-                while (*p != 0x0D)
-                {
-                    oswrch(9);
-                    do
-                        p++;
-                    while ((vflags & UTF8) &&
-                           (*(signed char *)p < -64));
-                }
-                while (p > buffer)
-                {
-                    oswrch(127);
-                    do
-                        p--;
-                    while ((vflags & UTF8) &&
-                           (*(signed char *)p < -64));
-                }
-                while ((*s != 0x0D) && (p < (buffer + 255)))
-                {
-                    oswrch(*s);
-                    *p++ = *s++;
-                }
-                *p = 0x0D;
-                current = n;
-            }
-            break;
-
         case 132:
         case 133:
         case 140:
@@ -396,35 +359,53 @@ void osline(char *buffer)
 }
 
 // Prepare for reporting an error
-void reset(void) {}
+void reset(void)
+{
+    printf("reset()\n");
+}
 
 // Test for ESCape
-void trap(void) {}
+void trap(void)
+{
+    printf("trap()\n");
+}
 
 // Load a file to memory
-void osload(char *, void *, int) {}
+void osload(char *name, void *buffer, int len)
+{
+    printf("osload(%s, %p, %d)\n", name, buffer, len);
+}
 
 // Save a file from memory
-void ossave(char *, void *, int) {}
+void ossave(char *name, void *buffer, int len)
+{
+    printf("ossave(%s, %p, %d)\n", name, buffer, len);
+}
 
 // Open a file
-int osopen(int, char *)
+int osopen(int x, char *y)
 {
+    printf("osopen(%d, %s)\n", x, y);
     return -1;
 }
 
 // Read a byte from a file
-unsigned char osbget(int, int *)
+unsigned char osbget(int x, int *y)
 {
+    printf("osbget(%d, %p)\n", x, y);
     return 0;
 }
 
 // Close file(s)
-void osshut(int) {}
+void osshut(int x)
+{
+    printf("osshut(%d)\n", x);
+}
 
 // No idea what this does
 int osbyte(int al, int xy)
 {
+    printf("osbyte(%d, %d)\n", al, xy);
     error(255, "Sorry, not implemented");
     return -1;
 }
@@ -432,6 +413,7 @@ int osbyte(int al, int xy)
 // No idea what this does
 void osword(int al, void *xy)
 {
+    printf("osword(%d, %p)\n", al, xy);
     error(255, "Sorry, not implemented");
     return;
 }
@@ -439,6 +421,7 @@ void osword(int al, void *xy)
 // Write a byte:
 void osbput(void *chan, unsigned char byte)
 {
+    printf("osbyte(%p, %d)\n", chan, byte);
 }
 
 // Request memory allocation above HIMEM:
@@ -457,6 +440,7 @@ heapptr oshwm(void *addr, int settop)
         {
             userTOP = addr;
         }
+        printf("oshwm(%p, %d) -> %p\n", addr, settop, addr);
         return (size_t)addr;
     }
 }
@@ -464,6 +448,7 @@ heapptr oshwm(void *addr, int settop)
 // Call an emulated OS subroutine (if CALL or USR to an address < 0x10000)
 int oscall(int addr)
 {
+    printf("oscall(%d)\n", addr);
     int al = stavar[1];
     void *xy = (void *)((size_t)stavar[24] | ((size_t)stavar[25] << 8));
     switch (addr)
@@ -528,6 +513,7 @@ int getims(void)
 // Put event into event queue, unless full:
 int putevt(heapptr handler, int msg, int wparam, int lparam)
 {
+    printf("putevt(%p, %d, %d, %d)\n", (void *)handler, msg, wparam, lparam);
     return -1;
 }
 
@@ -626,6 +612,7 @@ heapptr xtrap(void)
 // Report a 'fatal' error:
 void faterr(const char *msg)
 {
+    printf("Fatal error: %s\n", msg);
     error(512, "");
 }
 
@@ -686,25 +673,20 @@ void gfxPrimitivesSetFont(void){};
 void gfxPrimitivesGetFont(void){};
 void RedefineChar(void){};
 
-// newlib stuff
-extern int _end;
-
 void *_sbrk(int incr)
 {
-    static char *heap_end = 0;
-    char *prev_heap_end;
-
     if (heap_end == 0)
     {
         heap_end = &_heap_bottom;
     }
-    prev_heap_end = heap_end;
+    char *prev_heap_end = heap_end;
     if ((heap_end + incr) > &_heap_top)
     {
         return NULL;
     }
 
     heap_end += incr;
+
     return prev_heap_end;
 }
 
@@ -795,8 +777,28 @@ int main(void)
     *UART0_BAUDDIV = 25000000 / 115200;
     *UART0_CONTROL = 3;
 
-    char *userTOP = userRAM + sizeof(userRAMBuffer);
-    char *progRAM = userRAM + PAGE_OFFSET;
+    accs = (char *)userRAM;           // String accumulator
+    buff = (char *)accs + ACCSLEN;    // Temporary string buffer
+    path = (char *)buff + 0x100;      // File path
+    keystr = (char **)(path + 0x100); // *KEY strings
+    keybdq = (char *)keystr + 0x100;  // Keyboard queue
+    eventq = (void *)keybdq + 0x100;  // Event queue
+    filbuf[0] = (eventq + 0x200 / 4); // File buffers n.b. pointer arithmetic!!
+
+    farray = 1;                         // @hfile%() number of dimensions
+    fasize = MAX_PORTS + MAX_FILES + 4; // @hfile%() number of elements
+
+    vflags = UTF8; // Not |= (fails on Linux build)
+
+    memset(keystr, 0, 256);
+    spchan = NULL;
+    exchan = NULL;
+
+    puts(szVersion);
+    puts(szNotice);
+
+    userTOP = userRAM + DEFAULT_RAM;
+    void *progRAM = userRAM + PAGE_OFFSET; // Will be raised if @cmd$ exceeds 255 bytes
     basic(progRAM, userTOP, 0);
     return 0;
 }

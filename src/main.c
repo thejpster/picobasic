@@ -1,5 +1,8 @@
 /*
 Implementation of BBC BASIC for Neotron Pico
+
+Inspired by and in some places copied from https://github.com/Memotech-Bill/PicoBB
+
 */
 
 #include <memory.h>
@@ -12,6 +15,7 @@ Implementation of BBC BASIC for Neotron Pico
 
 #include "BBC.h"
 
+// UART registers for the MPS3-AN547 machine that QEMU emulates
 #define UART0_BASE ((unsigned int *)0x59303000)
 #define UART0_STATUS (UART0_BASE + 1)
 #define UART0_CONTROL (UART0_BASE + 2)

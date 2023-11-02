@@ -84,8 +84,4 @@ SECTIONS
     *(.ARM.exidx.*);
     *(.ARM.extab.*);
   }
-
-  _heap_bottom = .;
-  _heap_top = ORIGIN(RAM) + LENGTH(RAM);
-
 }

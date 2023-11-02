@@ -46,10 +46,9 @@ extern unsigned long _end_data;
 // .bss (uninitialized data to set to 0);
 extern unsigned long __bss_start__;
 extern unsigned long __bss_end__;
-// bottom of heap
-extern char _heap_bottom;
-// top of heap
-extern char _heap_top;
+
+/// How much heap is being used right now
+int heap_used = 0;
 
 extern int basic(void *ecx, void *edx, void *prompt);
 extern void error(int code, const char *msg);
@@ -83,9 +82,7 @@ void oscli(char *command)
     if (strcmp(command, "INFO\r") == 0)
     {
         puts("INFO:");
-        printf("    _heap_top = %p\n", &_heap_top);
-        printf(" _heap_bottom = %p\n", &_heap_bottom);
-        printf("     heap_end = %p\n", heap_end);
+        printf("    heap_used = %d\n", (int)heap_used);
         printf("userRAMBuffer = %p\n", userRAMBuffer);
         printf("      userRAM = %p\n", userRAM);
         printf("      userTOP = %p\n", userTOP);
@@ -598,17 +595,22 @@ void RedefineChar(void){};
 
 void *_sbrk(int incr)
 {
+#define HEAP_SIZE 4096
+    static char HEAP_MEMORY[HEAP_SIZE] = {0};
     if (heap_end == 0)
     {
-        heap_end = &_heap_bottom;
+        heap_end = HEAP_MEMORY;
     }
     char *prev_heap_end = heap_end;
-    if ((heap_end + incr) > &_heap_top)
+    if ((heap_end + incr) > (HEAP_MEMORY + HEAP_SIZE))
     {
+        __asm("bkpt");
         return NULL;
     }
 
     heap_end += incr;
+
+    heap_used = heap_end - HEAP_MEMORY;
 
     return prev_heap_end;
 }
@@ -723,7 +725,7 @@ void app_entry(NeotronApi *api)
     puts(szVersion);
     puts(szNotice);
 
-    userTOP = userRAM + DEFAULT_RAM;
+    userTOP = userRAM + sizeof(userRAMBuffer);
     void *progRAM = userRAM + PAGE_OFFSET; // Will be raised if @cmd$ exceeds 255 bytes
     basic(progRAM, userTOP, 0);
 }

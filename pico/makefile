@@ -1,5 +1,5 @@
 VPATH = ../src ../BBCSDL/src ../BBCSDL/include
-CXX = arm-none-eabi-gcc -Wall -g -fshort-enums -I ../BBCSDL/include -mcpu=cortex-m0plus -DPICO
+CXX = arm-none-eabi-gcc -Wall -O1 -g -fshort-enums -I ../BBCSDL/include -mcpu=cortex-m0plus -DNEOTRON
 
 OBJ = bbmain.o bbexec.o bbeval.o bbasmb.o bbdata.o main.o
 
@@ -21,19 +21,19 @@ debug: $(BINARY)
 	qemu-system-arm -machine mps3-an547 -cpu cortex-m55 -semihosting -serial stdio -s -S -kernel $<
 
 main.o: main.c
-	$(CXX) -Os -c $< -o $@
+	$(CXX) -c $< -o $@
 
 bbmain.o: bbmain.c
-	$(CXX) -O2 -c $< -o $@
+	$(CXX) -c $< -o $@
 
 bbexec.o: bbexec.c
-	$(CXX) -O2 -c -Wno-discarded-qualifiers $< -o $@
+	$(CXX) -c -Wno-discarded-qualifiers $< -o $@
 
 bbeval.o: bbeval.c
-	$(CXX) -O2 -Wno-array-bounds -c $< -o $@
+	$(CXX) -Wno-array-bounds -c $< -o $@
 
 bbasmb.o: bbasmb_arm_v6m.c
-	$(CXX) -O2 -c $< -o $@
+	$(CXX) -c $< -o $@
 
 bbdata.o: bbdata_arm_32.s
 	$(CXX) -c $< -o $@
